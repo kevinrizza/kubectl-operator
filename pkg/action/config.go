@@ -40,6 +40,22 @@ func (c *Configuration) BindFlags(fs *pflag.FlagSet) {
 	})
 }
 
+func DefaultScheme() (*runtime.Scheme, error) {
+	sch := scheme.Scheme
+	for _, f := range []func(*runtime.Scheme) error{
+		v1alpha1.AddToScheme,
+		operatorsv1.AddToScheme,
+		v1.AddToScheme,
+		apiextv1.AddToScheme,
+	} {
+		if err := f(sch); err != nil {
+			return nil, err
+		}
+	}
+
+	return sch, nil
+}
+
 func (c *Configuration) Load() error {
 	if c.overrides == nil {
 		c.overrides = &clientcmd.ConfigOverrides{}
