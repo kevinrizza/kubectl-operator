@@ -59,6 +59,7 @@ operators from the installed catalogs.`,
 		newOperatorListOperandsCmd(&cfg),
 		newOperatorDescribeCmd(&cfg),
 		newOlmV1Cmd(&cfg),
+		newOlmV1PackagesCmd(&cfg),
 		newVersionCmd(),
 	)
 
