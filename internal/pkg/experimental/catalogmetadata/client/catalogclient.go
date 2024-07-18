@@ -1,13 +1,11 @@
 package client
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
-	"slices"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -51,7 +49,7 @@ type Client struct {
 	fetcher Fetcher
 }
 
-func (c *Client) Packages(ctx context.Context) ([]string, error) {
+func (c *Client) GetPackages(ctx context.Context) ([]string, error) {
 	var allPackages []string
 
 	var catalogList catalogd.ClusterCatalogList
@@ -105,68 +103,4 @@ func (c *Client) Packages(ctx context.Context) ([]string, error) {
 	}
 
 	return allPackages, nil
-}
-
-func PopulateExtraFields(catalogName string, channels []*catalogmetadata.Channel, bundles []*catalogmetadata.Bundle, deprecations []*catalogmetadata.Deprecation) ([]*catalogmetadata.Bundle, error) {
-	bundlesMap := map[string]*catalogmetadata.Bundle{}
-	for i := range bundles {
-		bundleKey := fmt.Sprintf("%s-%s", bundles[i].Package, bundles[i].Name)
-		bundlesMap[bundleKey] = bundles[i]
-
-		bundles[i].CatalogName = catalogName
-	}
-
-	for _, ch := range channels {
-		for _, chEntry := range ch.Entries {
-			bundleKey := fmt.Sprintf("%s-%s", ch.Package, chEntry.Name)
-			bundle, ok := bundlesMap[bundleKey]
-			if !ok {
-				return nil, fmt.Errorf("bundle %q not found in catalog %q (package %q, channel %q)", chEntry.Name, catalogName, ch.Package, ch.Name)
-			}
-
-			bundle.InChannels = append(bundle.InChannels, ch)
-		}
-	}
-
-	// We sort the channels here because the order that channels appear in this list is non-deterministic.
-	// They are non-deterministic because they are originally read from the cache in a concurrent manner that
-	// provides no ordering guarantees.
-	//
-	// This sort isn't strictly necessary for correctness, but it makes the output consistent and easier to
-	// reason about.
-	for _, bundle := range bundles {
-		slices.SortFunc(bundle.InChannels, func(a, b *catalogmetadata.Channel) int { return cmp.Compare(a.Name, b.Name) })
-	}
-
-	// According to https://docs.google.com/document/d/1EzefSzoGZL2ipBt-eCQwqqNwlpOIt7wuwjG6_8ZCi5s/edit?usp=sharing
-	// the olm.deprecations FBC object is only valid when either 0 or 1 instances exist
-	// for any given package
-	deprecationMap := make(map[string]*catalogmetadata.Deprecation, len(deprecations))
-	for _, deprecation := range deprecations {
-		deprecationMap[deprecation.Package] = deprecation
-	}
-
-	for i := range bundles {
-		if dep, ok := deprecationMap[bundles[i].Package]; ok {
-			for _, entry := range dep.Entries {
-				switch entry.Reference.Schema {
-				case declcfg.SchemaPackage:
-					bundles[i].Deprecations = append(bundles[i].Deprecations, entry)
-				case declcfg.SchemaChannel:
-					for _, ch := range bundles[i].InChannels {
-						if ch.Name == entry.Reference.Name {
-							bundles[i].Deprecations = append(bundles[i].Deprecations, entry)
-							break
-						}
-					}
-				case declcfg.SchemaBundle:
-					if bundles[i].Name == entry.Reference.Name {
-						bundles[i].Deprecations = append(bundles[i].Deprecations, entry)
-					}
-				}
-			}
-		}
-	}
-
-	return bundles, nil
 }

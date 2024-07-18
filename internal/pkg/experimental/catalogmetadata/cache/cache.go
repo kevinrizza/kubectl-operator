@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +33,7 @@ var _ client.Fetcher = &filesystemCache{}
 //   - IF cached it will verify the cache is up to date. If it is up to date it will return
 //     the cached contents, if not it will fetch the new contents from the catalogd HTTP
 //     server and update the cached contents.
-func NewFilesystemCache(cachePath string, restcfg *rest.Config, client *http.Client, rootCAs *x509.CertPool) (client.Fetcher, error) {
+func NewFilesystemCache(cachePath string, restcfg *rest.Config, rootCAs *x509.CertPool) (client.Fetcher, error) {
 	cacheDataMap := map[string]cacheData{}
 	cacheFile := filepath.Join(cachePath, "cache.json")
 
@@ -50,7 +49,6 @@ func NewFilesystemCache(cachePath string, restcfg *rest.Config, client *http.Cli
 	return &filesystemCache{
 		cachePath:              cachePath,
 		cacheFile:              cacheFile,
-		client:                 client,
 		restcfg:                restcfg,
 		rootCAs:                rootCAs,
 		cacheDataByCatalogName: cacheDataMap,
@@ -71,10 +69,8 @@ type cacheData struct {
 // contents if the catalog does not already
 // exist in the cache.
 type filesystemCache struct {
-	//	mutex                  sync.RWMutex
 	cachePath              string
 	cacheFile              string
-	client                 *http.Client
 	restcfg                *rest.Config
 	rootCAs                *x509.CertPool
 	cacheDataByCatalogName map[string]cacheData
@@ -139,21 +135,13 @@ func (fsc *filesystemCache) FetchCatalogContents(ctx context.Context, catalog *c
 			return err
 		}
 
-		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.TLSClientConfig, err = rest.TLSConfigFor(fsc.restcfg)
-		if err != nil {
-			return err
-		}
-		if fsc.rootCAs != nil {
-			transport.TLSClientConfig.RootCAs = fsc.rootCAs
-		}
 		if fsc.restcfg.BearerToken != "" {
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", fsc.restcfg.BearerToken))
 		}
 
-		httpClient := http.Client{
-			Transport: transport,
-			Timeout:   30 * time.Second,
+		httpClient, err := portforward.NewHttpClient(fsc.restcfg, fsc.rootCAs)
+		if err != nil {
+			return fmt.Errorf("error creating http client to get catalog data: %w", err)
 		}
 
 		resp, err := httpClient.Do(req)
