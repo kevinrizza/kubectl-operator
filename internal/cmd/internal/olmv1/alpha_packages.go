@@ -21,7 +21,7 @@ func NewPackageCmd(cfg *action.Configuration) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			err := i.Run(cmd.Context())
 			if err != nil {
-				log.Fatalf("failed to install operator: %v", err)
+				log.Fatalf("failed to get packages: %v", err)
 			}
 		},
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 
 	"github.com/operator-framework/kubectl-operator/pkg/action"
@@ -30,7 +29,7 @@ func NewPackageLister(cfg *action.Configuration, restcfg *rest.Config) *PackageL
 }
 
 func (l *PackageLister) Run(ctx context.Context) error {
-	catalogdCA, err := portforward.GetClusterCA(ctx, l.config.Client, types.NamespacedName{Namespace: "olmv1-system", Name: "catalogd-catalogserver-cert"})
+	catalogdCA, err := portforward.GetClusterCA(ctx, l.config.Client)
 	if err != nil {
 		return fmt.Errorf("unable to get catalog CA: %w", err)
 	}
