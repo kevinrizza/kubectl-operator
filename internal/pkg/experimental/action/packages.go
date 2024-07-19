@@ -3,6 +3,8 @@ package action
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"k8s.io/client-go/rest"
 
@@ -14,17 +16,21 @@ import (
 )
 
 type PackageLister struct {
-	config  *action.Configuration
-	restcfg *rest.Config
+	config      *action.Configuration
+	restcfg     *rest.Config
+	cacheDir    string
+	catalogList []string
 
 	Logf func(string, ...interface{})
 }
 
-func NewPackageLister(cfg *action.Configuration, restcfg *rest.Config) *PackageLister {
+func NewPackageLister(cfg *action.Configuration, restcfg *rest.Config, cacheDir string, catalogList []string) *PackageLister {
 	return &PackageLister{
-		config:  cfg,
-		restcfg: restcfg,
-		Logf:    func(string, ...interface{}) {},
+		config:      cfg,
+		restcfg:     restcfg,
+		cacheDir:    cacheDir,
+		catalogList: catalogList,
+		Logf:        func(string, ...interface{}) {},
 	}
 }
 
@@ -34,7 +40,17 @@ func (l *PackageLister) Run(ctx context.Context) error {
 		return fmt.Errorf("unable to get catalog CA: %w", err)
 	}
 
-	fsCache, err := cache.NewFilesystemCache("./localcache", l.restcfg, catalogdCA)
+	cacheDir := ""
+	if l.cacheDir == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			//couldn't detect a home directory, so using local dir
+			cacheDir = "./operator-framework/cache"
+		}
+		cacheDir = filepath.Join(homeDir, "/operator-framework/cache")
+	}
+
+	fsCache, err := cache.NewFilesystemCache(cacheDir, l.restcfg, catalogdCA)
 	if err != nil {
 		return fmt.Errorf("unable to create filesystem cache: %w", err)
 	}
@@ -42,7 +58,7 @@ func (l *PackageLister) Run(ctx context.Context) error {
 	catalogClient := client.New(l.config.Client, fsCache)
 
 	// get list of packages
-	allPackages, err := catalogClient.GetPackages(ctx)
+	allPackages, err := catalogClient.GetPackages(ctx, l.catalogList)
 	if err != nil {
 		return fmt.Errorf("error fetching bundles: %w", err)
 	}

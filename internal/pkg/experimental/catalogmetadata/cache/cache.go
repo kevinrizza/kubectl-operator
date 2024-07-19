@@ -102,6 +102,12 @@ func (fsc *filesystemCache) FetchCatalogContents(ctx context.Context, catalog *c
 		return nil, fmt.Errorf("error: catalog %q has a nil status.resolvedSource.image value", catalog.Name)
 	}
 
+	// create cache dir if it doesn't yet exist
+	err := os.MkdirAll(fsc.cachePath, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("error: unable to create cache directory: %w", err)
+	}
+
 	cacheDir := filepath.Join(fsc.cachePath, catalog.Name)
 	if data, ok := fsc.cacheDataByCatalogName[catalog.Name]; ok {
 		if catalog.Status.ResolvedSource.Image.ResolvedRef == data.ResolvedRef {

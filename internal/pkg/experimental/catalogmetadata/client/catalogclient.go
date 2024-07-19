@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"slices"
+	"strings"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -49,7 +51,7 @@ type Client struct {
 	fetcher Fetcher
 }
 
-func (c *Client) GetPackages(ctx context.Context) ([]string, error) {
+func (c *Client) GetPackages(ctx context.Context, catalogs []string) ([]string, error) {
 	var allPackages []string
 
 	var catalogList catalogd.ClusterCatalogList
@@ -59,6 +61,10 @@ func (c *Client) GetPackages(ctx context.Context) ([]string, error) {
 
 	var errs []error
 	for _, catalog := range catalogList.Items {
+		if len(catalogs) > 0 && !slices.Contains(catalogs, strings.ToLower(catalog.Name)) {
+			// filter that catalog from the result
+			continue
+		}
 		// if the catalog has not been successfully unpacked, report an error. This ensures that our
 		// reconciles are deterministic and wait for all desired catalogs to be ready.
 		if !meta.IsStatusConditionPresentAndEqual(catalog.Status.Conditions, catalogd.TypeUnpacked, metav1.ConditionTrue) {
