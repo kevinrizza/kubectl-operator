@@ -42,7 +42,10 @@ func catalogList(clusterCatalogs string) []string {
 	var catalogList []string
 	rawCatalogList := strings.Split(clusterCatalogs, ",")
 	for _, catalog := range rawCatalogList {
-		catalogList = append(catalogList, strings.ToLower(catalog))
+		if catalog != "" {
+			catalogList = append(catalogList, strings.ToLower(catalog))
+		}
 	}
+
 	return catalogList
 }
