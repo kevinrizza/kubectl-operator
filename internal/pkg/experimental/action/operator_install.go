@@ -17,7 +17,10 @@ import (
 type OperatorInstall struct {
 	config *action.Configuration
 
-	Package string
+	Package          string
+	Version          string
+	ServiceAccount   string
+	InstallNamespace string
 
 	Logf func(string, ...interface{})
 }
@@ -38,7 +41,16 @@ func (i *OperatorInstall) Run(ctx context.Context) (*olmv1.ClusterExtension, err
 	opKey := types.NamespacedName{Name: i.Package}
 	op := &olmv1.ClusterExtension{
 		ObjectMeta: metav1.ObjectMeta{Name: opKey.Name},
-		Spec:       olmv1.ClusterExtensionSpec{PackageName: i.Package},
+		Spec: olmv1.ClusterExtensionSpec{
+			PackageName:      i.Package,
+			InstallNamespace: i.InstallNamespace,
+			ServiceAccount: olmv1.ServiceAccountReference{
+				Name: i.ServiceAccount,
+			},
+		},
+	}
+	if i.Version != "" {
+		op.Spec.Version = i.Version
 	}
 	if err := i.config.Client.Create(ctx, op); err != nil {
 		return nil, err
